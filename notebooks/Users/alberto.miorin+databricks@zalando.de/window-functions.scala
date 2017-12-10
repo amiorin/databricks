@@ -30,12 +30,12 @@ def toAmount(i: Long) = ((i % 20 + 1) * 50)
 
 // COMMAND ----------
 
-val df = spark.range(10000).map(c => (c, toCustomerId(c), toState(c), toDatetime(c), toAmount(c))).toDF("order_id", "customer_id", "state", "datetime", "amount")
-df.createOrReplaceTempView("orders")
+spark.range(10000).map(c => (c, toCustomerId(c), toState(c), toDatetime(c), toAmount(c))).toDF("order_id", "customer_id", "state", "datetime", "amount").createOrReplaceTempView("orders")
 
 // COMMAND ----------
 
-df.show
+// MAGIC %sql
+// MAGIC select * from orders
 
 // COMMAND ----------
 
@@ -69,6 +69,41 @@ df.show
 // MAGIC FROM monthly_revenue
 // MAGIC )
 // MAGIC SELECT *,
-// MAGIC round(100.0*(revenue-prev_month_revenue)/prev_month_revenue,1) as revenue_growth
+// MAGIC round(100.0*(revenue-prev_month_revenue)/prev_month_revenue, 1) as revenue_growth
 // MAGIC FROM prev_month_revenue
 // MAGIC ORDER BY 1
+
+// COMMAND ----------
+
+// MAGIC %md
+// MAGIC # Deduplicate
+
+// COMMAND ----------
+
+def toDuplicate(i: Long): Long = {
+  if ((i % 2) == 0) {
+    i
+  } else {
+    i - 1
+  }
+}
+
+// COMMAND ----------
+
+spark.range(10000).map(c => (toDuplicate(c), toCustomerId(c), toState(c), toDatetime(c), toAmount(c))).toDF("order_id", "customer_id", "state", "datetime", "amount").createOrReplaceTempView("orders2")
+
+// COMMAND ----------
+
+// MAGIC %sql
+// MAGIC select * from orders2
+
+// COMMAND ----------
+
+// MAGIC %sql
+// MAGIC select *
+// MAGIC from(
+// MAGIC SELECT *,
+// MAGIC row_number() over (partition by order_id order by datetime desc) as row_number
+// MAGIC FROM orders2
+// MAGIC ) where row_number = 1
+// MAGIC order by 1
